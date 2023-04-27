@@ -1,0 +1,76 @@
+version: "3.5"
+
+services:
+  app:
+    container_name: app_prod
+    restart: always
+    image: mikeyy19xx/my_app_proj1:latest 
+    build:
+      context: .
+    ports:
+      - 8001:8001
+    # expose:
+    #   - 8001
+    volumes:
+      - ./app:/app
+    command: >
+      sh -c "python manage.py wait_for_db && 
+             python manage.py migrate &&
+             gunicorn app.wsgi:application --workers 3  --bind 0.0.0.0:8001"
+    env_file:
+      - .env-prod
+    depends_on:
+      - db_prod
+    networks:
+      ahjin_network_prod:
+        aliases:
+          - app-backend
+
+  db_prod:
+    image: postgres:10-alpine
+    restart: always
+    env_file:
+      - .env-prod
+    volumes:
+      - db_prod:/var/lib/postgresql/data
+
+    networks:
+      ahjin_network_prod:
+        aliases:
+          - pg-database
+    
+  nginx:
+    build: ./app/nginx
+    image: mikeyy19xx/my_nginx_proj1:latest
+    restart: always
+    container_name: nginx_prod
+    volumes:
+      - static_volume:/home/app/web/staticfiles
+    ports:
+      - 8000:80
+    depends_on:
+      - app
+    networks:
+      ahjin_network_prod:
+        aliases:
+          - nginx
+  
+  front:
+    image: mikeyy19xx/colz_app_proj1:latest
+    ports:
+    - 127.0.0.1:3000:3000
+    networks:
+      - ahjin_network_prod
+    depends_on:
+      - nginx
+      - app
+      - db_prod
+
+volumes:
+  db_prod:
+    driver: local
+  static_volume:
+
+networks:
+  ahjin_network_prod:
+    name: ahjin_network_prod
